@@ -69,6 +69,14 @@ type Particle = {
   additive: boolean
 }
 
+// Plate state
+type PlateState = {
+  tx: number
+  ty: number
+  pressed: boolean
+  pressTime: number
+}
+
 const TILE = 32
 const GRAVITY = 1800
 const MOVE_SPEED = 280
@@ -176,47 +184,37 @@ function isSolid(ch: string, doorOpen: boolean) {
   if (ch === "X") return true
   return false
 }
-
-// Dark holes and pools
 function isPlate(ch: string) {
   return ch === "P"
 }
 
-// New colored hole helpers
+// Colored hole helpers
 function isColoredHole(ch: string) {
   return ch === "f" || ch === "a" || ch === "e" || ch === "n"
 }
 function safePlayerForColoredHole(ch: string): 1 | 2 | 3 | 4 | null {
   switch (ch) {
     case "f":
-      return 1 // Fire
+      return 1
     case "a":
-      return 2 // Water
+      return 2
     case "e":
-      return 3 // Earth
+      return 3
     case "n":
-      return 4 // Wind
+      return 4
     default:
       return null
   }
 }
 function isLiquidForPlayer(ch: string, playerId: number) {
   if (ch === "W") return true
-  if (isColoredHole(ch)) {
-    return safePlayerForColoredHole(ch) === (playerId as 1 | 2 | 3 | 4)
-  }
+  if (isColoredHole(ch)) return safePlayerForColoredHole(ch) === (playerId as 1 | 2 | 3 | 4)
   return false
 }
 function isHazardFor(ch: string, playerId: number) {
-  // Green pools always deadly
-  if (ch === "~") return true
-  // Dark holes deadly to all until filled
-  if (ch === "O") return true
-  // Colored holes deadly unless it's your color
-  if (isColoredHole(ch)) {
-    return safePlayerForColoredHole(ch) !== (playerId as 1 | 2 | 3 | 4)
-  }
-  // Everything else: not a hazard
+  if (ch === "~") return true // poison
+  if (ch === "O") return true // dark hole
+  if (isColoredHole(ch)) return safePlayerForColoredHole(ch) !== (playerId as 1 | 2 | 3 | 4)
   return false
 }
 
@@ -224,6 +222,8 @@ function drawLevel(
   ctx: CanvasRenderingContext2D,
   level: Level,
   gateReached: Partial<Record<1 | 2 | 3 | 4, boolean>> = {},
+  plates: Map<string, PlateState> = new Map(),
+  now: number = performance.now(),
 ) {
   const { w, h, tileSize, doorOpen } = level
   for (let y = 0; y < h; y++) {
@@ -241,38 +241,52 @@ function drawLevel(
         ctx.fillStyle = "rgba(255,255,255,0.25)"
         ctx.fillRect(px, py + tileSize - 6, tileSize, 3)
       } else if (c === "O") {
-        // Dark hole
         ctx.fillStyle = "#0f172a"
         ctx.fillRect(px, py, tileSize, tileSize)
       } else if (c === "W") {
-        // Water
         ctx.fillStyle = "rgba(14,165,233,0.65)"
         ctx.fillRect(px, py, tileSize, tileSize)
         ctx.fillStyle = "rgba(255,255,255,0.35)"
         ctx.fillRect(px, py + tileSize - 8, tileSize, 3)
       } else if (isColoredHole(c)) {
-        // Colored holes: draw dark base with colored ring
         const colors: Record<string, string> = {
-          f: "#ef4444", // Fire safe
-          a: "#14b8a6", // Water safe
-          e: "#92400e", // Earth safe
-          n: "#38bdf8", // Wind safe
+          f: "#ef4444",
+          a: "#14b8a6",
+          e: "#92400e",
+          n: "#38bdf8",
         }
         ctx.fillStyle = "#0f172a"
         ctx.fillRect(px, py, tileSize, tileSize)
-        // Outer ring
         ctx.strokeStyle = colors[c]
         ctx.lineWidth = 3
         ctx.strokeRect(px + 2, py + 2, tileSize - 4, tileSize - 4)
-        // Inner glow
         ctx.fillStyle = `${colors[c]}55`
         ctx.fillRect(px + 6, py + 6, tileSize - 12, tileSize - 12)
-        // Surface sheen
         ctx.fillStyle = "rgba(255,255,255,0.25)"
         ctx.fillRect(px + 4, py + tileSize - 7, tileSize - 8, 3)
       } else if (c === "P") {
-        ctx.fillStyle = "#f59e0b"
-        ctx.fillRect(px + 6, py + tileSize - 8, tileSize - 12, 6)
+        const key = `${x},${y}`
+        const st = plates.get(key)
+        const pressed = st?.pressed
+        // Base plate
+        ctx.fillStyle = pressed ? "#22c55e" : "#f59e0b"
+        const inset = pressed ? 8 : 6
+        ctx.fillRect(px + inset, py + tileSize - inset - 2, tileSize - inset * 2, 6)
+        // Button cap
+        ctx.fillStyle = pressed ? "#16a34a" : "#b45309"
+        ctx.fillRect(px + inset + 2, py + tileSize - inset - 4, tileSize - (inset + 2) * 2, 3)
+        // Pulse ring shortly after press
+        if (pressed && st) {
+          const t = (now - st.pressTime) / 600
+          if (t < 1.2) {
+            ctx.strokeStyle = "rgba(34,197,94,0.55)"
+            ctx.lineWidth = 2
+            const r = 4 + t * 12
+            ctx.beginPath()
+            ctx.arc(px + tileSize / 2, py + tileSize - inset - 3, r, 0, Math.PI * 2)
+            ctx.stroke()
+          }
+        }
       } else if (c === "D") {
         if (!doorOpen) {
           ctx.fillStyle = "#7c3aed"
@@ -284,7 +298,6 @@ function drawLevel(
           ctx.strokeRect(px + 4, py + 4, tileSize - 8, tileSize - 8)
         }
       } else if (c === "b") {
-        // Breakable barrier (fire can destroy)
         ctx.fillStyle = "#dc2626"
         ctx.fillRect(px, py, tileSize, tileSize)
         ctx.fillStyle = "#fecaca"
@@ -295,19 +308,17 @@ function drawLevel(
         ctx.strokeStyle = "#f59e0b"
         ctx.strokeRect(px + 4, py + 4, tileSize - 8, tileSize - 8)
       } else if (c === "A" || c === "B" || c === "C" || c === "D") {
-        // Gates
         const gateColors: Record<string, { main: string; inner: string }> = {
-          A: { main: "#ef4444", inner: "#fecaca" }, // Fire
-          B: { main: "#14b8a6", inner: "#99f6e4" }, // Water
-          C: { main: "#92400e", inner: "#f59e0b" }, // Earth
-          D: { main: "#38bdf8", inner: "#bae6fd" }, // Wind
+          A: { main: "#ef4444", inner: "#fecaca" },
+          B: { main: "#14b8a6", inner: "#99f6e4" },
+          C: { main: "#92400e", inner: "#f59e0b" },
+          D: { main: "#38bdf8", inner: "#bae6fd" },
         }
         const gc = gateColors[c]
         ctx.fillStyle = gc.main
         ctx.fillRect(px, py, tileSize, tileSize)
         ctx.fillStyle = gc.inner
         ctx.fillRect(px + 5, py + 5, tileSize - 10, tileSize - 10)
-        // Gate bars
         ctx.strokeStyle = "rgba(0,0,0,0.25)"
         ctx.lineWidth = 2
         for (let i = 0; i < 3; i++) {
@@ -317,11 +328,9 @@ function drawLevel(
           ctx.lineTo(gx, py + tileSize - 4)
           ctx.stroke()
         }
-        // Checkmark indicator if reached
         const charToId: Record<string, 1 | 2 | 3 | 4> = { A: 1, B: 2, C: 3, D: 4 }
         const pid = charToId[c]
         if (gateReached[pid]) {
-          // Drop shadow
           ctx.strokeStyle = "rgba(0,0,0,0.6)"
           ctx.lineCap = "round"
           ctx.lineJoin = "round"
@@ -331,7 +340,6 @@ function drawLevel(
           ctx.lineTo(px + tileSize / 2 - 2, py + tileSize - 7)
           ctx.lineTo(px + tileSize - 7, py + 8)
           ctx.stroke()
-          // Foreground
           ctx.strokeStyle = "#ffffff"
           ctx.lineWidth = 3.5
           ctx.beginPath()
@@ -576,6 +584,7 @@ function useSound() {
       })
     },
     jump: () => playTone({ freq: 420, duration: 0.08, volume: 0.07, type: "square", sweep: 60 }),
+    platePress: () => playTone({ freq: 900, duration: 0.1, volume: 0.14, type: "triangle", sweep: -200 }),
   }
 }
 
@@ -636,6 +645,24 @@ export default function FourPlayerPlatformer() {
   const { spawns, exits } = useMemo(() => findSpawnsAndExits(levelRef.current), [])
   const playersRef = useRef<Player[]>(createPlayers(spawns, bindings))
 
+  // Plate states
+  const platesRef = useRef<Map<string, PlateState>>(new Map())
+  function initPlates(level: Level) {
+    const m = new Map<string, PlateState>()
+    for (let y = 0; y < level.h; y++) {
+      for (let x = 0; x < level.w; x++) {
+        if (level.tiles[y][x] === "P") {
+          m.set(`${x},${y}`, { tx: x, ty: y, pressed: false, pressTime: 0 })
+        }
+      }
+    }
+    platesRef.current = m
+  }
+  useEffect(() => {
+    initPlates(levelRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Particles
   const particlesRef = useRef<Particle[]>([])
   const MAX_PARTICLES = 4000
@@ -695,6 +722,7 @@ export default function FourPlayerPlatformer() {
     const level = createLevel()
     levelRef.current = level
     tempPlatformsRef.current = []
+    initPlates(level)
     const fresh = createPlayers(spawns, bindings)
     playersRef.current = fresh
     prevActionDownRef.current = { 1: false, 2: false, 3: false, 4: false }
@@ -721,6 +749,7 @@ export default function FourPlayerPlatformer() {
   }, [resetGame])
 
   function updateDoorOpen(level: Level, players: Player[]) {
+    // Keep the door logic as "2 players currently standing on plates"
     let onPlates = 0
     for (const p of players) {
       const ch = tileCharAt(level, p.pos.x, p.pos.y + p.h / 2 + 1)
@@ -840,6 +869,29 @@ export default function FourPlayerPlatformer() {
       })
     }
   }
+  function spawnPlatePressAt(x: number, y: number) {
+    const count = 14
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2
+      const sp = 60 + Math.random() * 140
+      particlesRef.current.push({
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 20,
+        life: 0,
+        maxLife: 0.35 + Math.random() * 0.2,
+        size: 6 + Math.random() * 6,
+        colorStart: "#22c55e",
+        colorEnd: "rgba(34,197,94,0.05)",
+        gravity: 900,
+        damping: 0.88,
+        shape: "circle",
+        additive: false,
+      })
+    }
+  }
+  // Footsteps
   function spawnFireStep(x: number, y: number, dir: number) {
     const count = 4 * 5
     for (let i = 0; i < count; i++) {
@@ -954,7 +1006,7 @@ export default function FourPlayerPlatformer() {
     trimParticles()
   }
 
-  // Water: convert dark holes (O) in a 3x3 (including diagonals) into water
+  // Water: convert dark holes (O) in 3x3 area (diag included) into water
   function doWaterAction(level: Level, p: Player) {
     const { tx, ty } = worldToTile(p.pos.x, p.pos.y, level.tileSize)
     let filled = false
@@ -983,7 +1035,6 @@ export default function FourPlayerPlatformer() {
     const ahead = worldToTile(p.pos.x + p.facing * (p.w / 2 + 8), p.pos.y, level.tileSize)
     const canPlace = (tx: number, ty: number) => {
       const ch = tileAt(level, tx, ty)
-      // Allow placing on empty, dark hole, water, and colored holes
       return ch === "." || ch === "O" || ch === "W" || isColoredHole(ch)
     }
     let placedAt: { tx: number; ty: number } | null = null
@@ -1100,6 +1151,30 @@ export default function FourPlayerPlatformer() {
     trimParticles()
   }
 
+  function pressPlateIfStanding(level: Level, p: Player) {
+    // Check center and feet tiles for a plate and latch it
+    const center = worldToTile(p.pos.x, p.pos.y, level.tileSize)
+    const feet = worldToTile(p.pos.x, p.pos.y + p.h / 2 + 2, level.tileSize)
+    const candidates = [center, feet]
+    for (const { tx, ty } of candidates) {
+      if (tileAt(level, tx, ty) === "P") {
+        const key = `${tx},${ty}`
+        const m = platesRef.current
+        const st = m.get(key)
+        if (st && !st.pressed) {
+          st.pressed = true
+          st.pressTime = performance.now()
+          m.set(key, st)
+          const cx = tx * TILE + TILE / 2
+          const cy = ty * TILE + TILE / 2
+          spawnPlatePressAt(cx, cy)
+          sound.platePress()
+          trimParticles()
+        }
+      }
+    }
+  }
+
   function updatePlayer(level: Level, p: Player, dt: number) {
     const pressed = input.pressed.current
     const { left, right, jump, action } = p.controls
@@ -1111,7 +1186,7 @@ export default function FourPlayerPlatformer() {
     const justPressedAction = actionDown && !prevAction
     prevActionDownRef.current[p.id] = actionDown
 
-    // Liquids: water, plus colored holes if safe for this player
+    // Liquids
     const centerChar = tileCharAt(level, p.pos.x, p.pos.y)
     const inLiquid = isLiquidForPlayer(centerChar, p.id)
 
@@ -1156,7 +1231,7 @@ export default function FourPlayerPlatformer() {
       }
     }
 
-    // Jump
+    // Jump (on land)
     if (!p.isDashing && !inLiquid) {
       if (jumpDown) {
         if (p.onGround && !p.jumpLock) {
@@ -1176,9 +1251,12 @@ export default function FourPlayerPlatformer() {
 
     moveAndCollide(level, p, dt)
 
-    // Hazard check (tile under feet)
+    // Plate press check
+    pressPlateIfStanding(level, p)
+
+    // Hazard check: kill if center or feet tile is hazardous (fix side-entry issue)
     const belowChar = tileCharAt(level, p.pos.x, p.pos.y + p.h / 2 + 2)
-    if (isHazardFor(belowChar, p.id)) {
+    if (isHazardFor(centerChar, p.id) || isHazardFor(belowChar, p.id)) {
       p.pos = { x: p.spawn.x, y: p.spawn.y }
       p.vel = { x: 0, y: 0 }
       p.alive = true
@@ -1222,7 +1300,7 @@ export default function FourPlayerPlatformer() {
       trimParticles()
     }
 
-    // Exit check
+    // Exit check (still set exitReached for UI; win gating handled globally)
     const exitList = exits[p.id]
     p.exitReached = false
     for (const ex of exitList) {
@@ -1285,13 +1363,20 @@ export default function FourPlayerPlatformer() {
         updateDoorOpen(level, playersRef.current)
         for (const p of playersRef.current) updatePlayer(level, p, dt)
         updateParticles(dt)
-        if (playersRef.current.every((p) => p.exitReached)) {
+
+        // Win condition: all players at their gates AND all plates pressed
+        const allPlayersAtGates = playersRef.current.every((p) => p.exitReached)
+        let allPlatesPressed = true
+        platesRef.current.forEach((st) => {
+          if (!st.pressed) allPlatesPressed = false
+        })
+        if (allPlayersAtGates && allPlatesPressed) {
           setWon(true)
           setPaused(true)
         }
       }
 
-      // Gate reached map
+      // Build reached map for gate checkmarks
       const gateReached: Record<1 | 2 | 3 | 4, boolean> = {
         1: !!playersRef.current.find((p) => p.id === 1)?.exitReached,
         2: !!playersRef.current.find((p) => p.id === 2)?.exitReached,
@@ -1301,7 +1386,7 @@ export default function FourPlayerPlatformer() {
 
       // Draw
       ctx.clearRect(0, 0, canvas.width, canvas.height)
-      drawLevel(ctx, level, gateReached)
+      drawLevel(ctx, level, gateReached, platesRef.current, performance.now())
       for (const p of playersRef.current) drawPlayer(ctx, p)
 
       // Particles over players
@@ -1459,6 +1544,7 @@ export default function FourPlayerPlatformer() {
                         others.
                       </li>
                       <li>Stand on plates (orange) to open purple doors. You need 2 players on plates at once.</li>
+                      <li>All plates must be pressed at least once before you can win.</li>
                     </ul>
                   </div>
                   <Separator />
@@ -1514,7 +1600,7 @@ export default function FourPlayerPlatformer() {
             <div className="pointer-events-auto rounded-md bg-white p-4 shadow">
               <div className="text-center font-semibold">{won ? "Victory!" : "Paused"}</div>
               <div className="mt-2 text-center text-sm text-muted-foreground">
-                {won ? "All players reached their exits." : "Press P/Esc to resume"}
+                {won ? "All players reached their exits and all plates were pressed." : "Press P/Esc to resume"}
               </div>
             </div>
           </div>
