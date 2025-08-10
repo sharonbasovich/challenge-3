@@ -111,19 +111,19 @@ const LEVEL_MAP: string[] = [
   "#..................#...................#",
   "#.............~~~~~#...................#",
   "#..................#...................#",
-  "#...........######H######..............#",
+  "#...........######Z######..............#",
   "#..................#....#..............#",
   "#......###.........#....#..............#",
   "#..................#..................#",
   "#.1....O..O...2....#....#..............#",
   "#......#####.......#....#..............#",
   "#..................#..................#",
-  "#...........######H######..............#",
+  "#...........######Z######..............#",
   "#..................#...................#",
   "#.....OOOOOO.......#........fane..b....#",
   "#..................#...................#",
   "#......###.........#...................#",
-  "#..................#...................#",
+  "#..................#..................#",
   "#...3.........4....P...##OO..A.B.C...D.#",
   "########################################",
 ]
@@ -179,7 +179,7 @@ function replaceChar(str: string, index: number, char: string) {
 
 function isSolid(ch: string, doorOpen: boolean) {
   if (ch === "#") return true
-  if (ch === "H") return !doorOpen
+  if (ch === "Z") return !doorOpen
   if (ch === "b") return true
   if (ch === "X") return true
   return false
@@ -287,7 +287,7 @@ function drawLevel(
             ctx.stroke()
           }
         }
-      } else if (c === "H") {
+      } else if (c === "Z") {
         if (!doorOpen) {
           ctx.fillStyle = "#7c3aed"
           ctx.fillRect(px, py, tileSize, tileSize)
@@ -352,322 +352,410 @@ function drawLevel(
     }
   }
 
-  function useKeySet() {
-    const pressed = useRef<Set<string>>(new Set())
-    const lastDown = useRef<Map<string, number>>(new Map())
-    const doubleTap = useRef<Set<string>>(new Set())
+function useKeySet() {
+  const pressed = useRef<Set<string>>(new Set())
+  const lastDown = useRef<Map<string, number>>(new Map())
+  const doubleTap = useRef<Set<string>>(new Set())
 
-    useEffect(() => {
-      const onDown = (e: KeyboardEvent) => {
-        const blockKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "]
-        if (blockKeys.includes(e.key)) e.preventDefault()
-        if (!e.repeat) {
-          const now = performance.now()
-          const last = lastDown.current.get(e.key) ?? 0
-          if (now - last <= DOUBLE_TAP_WINDOW) {
-            doubleTap.current.add(e.key)
-          }
-          lastDown.current.set(e.key, now)
+  useEffect(() => {
+    const onDown = (e: KeyboardEvent) => {
+      const blockKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "]
+      if (blockKeys.includes(e.key)) e.preventDefault()
+      if (!e.repeat) {
+        const now = performance.now()
+        const last = lastDown.current.get(e.key) ?? 0
+        if (now - last <= DOUBLE_TAP_WINDOW) {
+          doubleTap.current.add(e.key)
         }
-        pressed.current.add(e.key)
+        lastDown.current.set(e.key, now)
       }
-      const onUp = (e: KeyboardEvent) => {
-        pressed.current.delete(e.key)
-      }
-      window.addEventListener("keydown", onDown, { passive: false })
-      window.addEventListener("keyup", onUp)
-      return () => {
-        window.removeEventListener("keydown", onDown as any)
-        window.removeEventListener("keyup", onUp as any)
-      }
-    }, [])
-
-    return { pressed, doubleTap }
-  }
-
-  function createPlayers(spawns: Record<number, Vec2>, controls: Record<number, KeyBinding>): Player[] {
-    const size = { w: 22, h: 28 }
-    const mk = (id: number, name: string, color: string, maxAirJumps: number): Player => ({
-      id,
-      name,
-      color,
-      spawn: { x: spawns[id].x, y: spawns[id].y },
-      pos: { x: spawns[id].x, y: spawns[id].y },
-      vel: { x: 0, y: 0 },
-      w: size.w,
-      h: size.h,
-      onGround: false,
-      jumpLock: false,
-      alive: true,
-      exitReached: false,
-      controls: controls[id],
-      facing: 1,
-      maxAirJumps,
-      airJumpsLeft: maxAirJumps,
-      isDashing: false,
-      dashUntil: 0,
-      dashCooldownUntil: 0,
-      abilityCooldownUntil: 0,
-      nextStepFxTime: 0,
-    })
-    return [
-      mk(1, "Fire", "#ef4444", 0),
-      mk(2, "Water", "#14b8a6", 0),
-      mk(3, "Earth", "#92400e", 0),
-      mk(4, "Wind", "#38bdf8", 0),
-    ]
-  }
-
-  function solidAt(level: Level, x: number, y: number) {
-    const { tx, ty } = worldToTile(x, y, level.tileSize)
-    return isSolid(tileAt(level, tx, ty), level.doorOpen)
-  }
-  function tileCharAt(level: Level, x: number, y: number) {
-    const { tx, ty } = worldToTile(x, y, level.tileSize)
-    return tileAt(level, tx, ty)
-  }
-  function tileAt(level: Level, tx: number, ty: number) {
-    if (ty < 0 || ty >= level.h || tx < 0 || tx >= level.w) return "#"
-    return level.tiles[ty][tx]
-  }
-  function setTile(level: Level, tx: number, ty: number, ch: string) {
-    if (ty < 0 || ty >= level.h || tx < 0 || tx >= level.w) return
-    level.tiles[ty] = replaceChar(level.tiles[ty], tx, ch)
-  }
-
-  function drawPlayer(ctx: CanvasRenderingContext2D, p: Player) {
-    const { x, y } = p.pos
-    ctx.save()
-    ctx.translate(x, y)
-    ctx.fillStyle = p.color
-    ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h)
-    ctx.fillStyle = "#0b0b0b"
-    ctx.fillRect(-p.w / 4, -p.h / 4, 4, 4)
-    ctx.fillRect(p.w / 4 - 4, -p.h / 4, 4, 4)
-    ctx.fillStyle = "rgba(0,0,0,0.2)"
-    ctx.fillRect(-p.w / 2, p.h / 2 - 2, p.w, 4)
-    ctx.fillStyle = "rgba(255,255,255,0.5)"
-    ctx.fillRect(p.facing === 1 ? p.w / 2 - 2 : -p.w / 2 - 2, -p.h / 4, 2, p.h / 2)
-    ctx.restore()
-  }
-
-  // Audio synthesis
-  function useSound() {
-    const ctxRef = useRef<AudioContext | null>(null)
-    function ensureCtx() {
-      if (typeof window === "undefined") return null
-      if (!ctxRef.current) {
-        const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext
-        if (!Ctx) return null
-        ctxRef.current = new Ctx()
-      }
-      if (ctxRef.current?.state === "suspended") ctxRef.current.resume()
-      return ctxRef.current
+      pressed.current.add(e.key)
     }
-    function makeGain(ctx: AudioContext, value: number) {
-      const g = ctx.createGain()
-      g.gain.value = value
-      g.connect(ctx.destination)
-      return g
+    const onUp = (e: KeyboardEvent) => {
+      pressed.current.delete(e.key)
     }
-    function playNoiseBurst({
-      duration = 0.15,
-      volume = 0.25,
-      type = "white",
-      filterType,
-      filterFreq,
-      decay = 0.15,
-    }: {
-      duration?: number
-      volume?: number
-      type?: "white" | "pink"
-      filterType?: BiquadFilterType
-      filterFreq?: number
-      decay?: number
-    }) {
-      const ctx = ensureCtx()
-      if (!ctx) return
-      const bufferSize = Math.floor(duration * ctx.sampleRate)
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
-      const data = buffer.getChannelData(0)
-      let pink = 0
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1
-        if (type === "pink") {
-          pink = 0.98 * pink + 0.02 * white
-          data[i] = pink
-        } else {
-          data[i] = white
+    window.addEventListener("keydown", onDown, { passive: false })
+    window.addEventListener("keyup", onUp)
+    return () => {
+      window.removeEventListener("keydown", onDown as any)
+      window.removeEventListener("keyup", onUp as any)
+    }
+  }, [])
+
+  return { pressed, doubleTap }
+}
+
+function createPlayers(spawns: Record<number, Vec2>, controls: Record<number, KeyBinding>): Player[] {
+  const size = { w: 22, h: 28 }
+  const mk = (id: number, name: string, color: string, maxAirJumps: number): Player => ({
+    id,
+    name,
+    color,
+    spawn: { x: spawns[id].x, y: spawns[id].y },
+    pos: { x: spawns[id].x, y: spawns[id].y },
+    vel: { x: 0, y: 0 },
+    w: size.w,
+    h: size.h,
+    onGround: false,
+    jumpLock: false,
+    alive: true,
+    exitReached: false,
+    controls: controls[id],
+    facing: 1,
+    maxAirJumps,
+    airJumpsLeft: maxAirJumps,
+    isDashing: false,
+    dashUntil: 0,
+    dashCooldownUntil: 0,
+    abilityCooldownUntil: 0,
+    nextStepFxTime: 0,
+  })
+  return [
+    mk(1, "Fire", "#ef4444", 0),
+    mk(2, "Water", "#14b8a6", 0),
+    mk(3, "Earth", "#92400e", 0),
+    mk(4, "Wind", "#38bdf8", 0),
+  ]
+}
+
+function solidAt(level: Level, x: number, y: number) {
+  const { tx, ty } = worldToTile(x, y, level.tileSize)
+  return isSolid(tileAt(level, tx, ty), level.doorOpen)
+}
+function tileCharAt(level: Level, x: number, y: number) {
+  const { tx, ty } = worldToTile(x, y, level.tileSize)
+  return tileAt(level, tx, ty)
+}
+function tileAt(level: Level, tx: number, ty: number) {
+  if (ty < 0 || ty >= level.h || tx < 0 || tx >= level.w) return "#"
+  return level.tiles[ty][tx]
+}
+function setTile(level: Level, tx: number, ty: number, ch: string) {
+  if (ty < 0 || ty >= level.h || tx < 0 || tx >= level.w) return
+  level.tiles[ty] = replaceChar(level.tiles[ty], tx, ch)
+}
+
+function drawPlayer(ctx: CanvasRenderingContext2D, p: Player) {
+  const { x, y } = p.pos
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.fillStyle = p.color
+  ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h)
+  ctx.fillStyle = "#0b0b0b"
+  ctx.fillRect(-p.w / 4, -p.h / 4, 4, 4)
+  ctx.fillRect(p.w / 4 - 4, -p.h / 4, 4, 4)
+  ctx.fillStyle = "rgba(0,0,0,0.2)"
+  ctx.fillRect(-p.w / 2, p.h / 2 - 2, p.w, 4)
+  ctx.fillStyle = "rgba(255,255,255,0.5)"
+  ctx.fillRect(p.facing === 1 ? p.w / 2 - 2 : -p.w / 2 - 2, -p.h / 4, 2, p.h / 2)
+  ctx.restore()
+}
+
+// Audio synthesis
+function useSound() {
+  const ctxRef = useRef<AudioContext | null>(null)
+  function ensureCtx() {
+    if (typeof window === "undefined") return null
+    if (!ctxRef.current) {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext
+      if (!Ctx) return null
+      ctxRef.current = new Ctx()
+    }
+    if (ctxRef.current?.state === "suspended") ctxRef.current.resume()
+    return ctxRef.current
+  }
+  function makeGain(ctx: AudioContext, value: number) {
+    const g = ctx.createGain()
+    g.gain.value = value
+    g.connect(ctx.destination)
+    return g
+  }
+  function playNoiseBurst({
+    duration = 0.15,
+    volume = 0.25,
+    type = "white",
+    filterType,
+    filterFreq,
+    decay = 0.15,
+  }: {
+    duration?: number
+    volume?: number
+    type?: "white" | "pink"
+    filterType?: BiquadFilterType
+    filterFreq?: number
+    decay?: number
+  }) {
+    const ctx = ensureCtx()
+    if (!ctx) return
+    const bufferSize = Math.floor(duration * ctx.sampleRate)
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
+    const data = buffer.getChannelData(0)
+    let pink = 0
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1
+      if (type === "pink") {
+        pink = 0.98 * pink + 0.02 * white
+        data[i] = pink
+      } else {
+        data[i] = white
+      }
+    }
+    const src = ctx.createBufferSource()
+    src.buffer = buffer
+    let node: AudioNode = src
+    if (filterType) {
+      const filt = ctx.createBiquadFilter()
+      filt.type = filterType
+      filt.frequency.value = filterFreq ?? 800
+      node.connect(filt)
+      node = filt
+    }
+    const gain = ctx.createGain()
+    gain.gain.value = volume
+    node.connect(gain)
+    gain.connect(ctx.destination)
+    const now = ctx.currentTime
+    gain.gain.setValueAtTime(volume, now)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + decay)
+    src.start()
+    src.stop(now + duration)
+  }
+  function playTone({
+    freq = 400,
+    duration = 0.12,
+    volume = 0.2,
+    type = "sine",
+    sweep = 0,
+  }: {
+    freq?: number
+    duration?: number
+    volume?: number
+    type?: OscillatorType
+    sweep?: number
+  }) {
+    const ctx = ensureCtx()
+    if (!ctx) return
+    const osc = ctx.createOscillator()
+    const gain = makeGain(ctx, volume)
+    osc.type = type
+    const now = ctx.currentTime
+    osc.frequency.setValueAtTime(freq, now)
+    if (sweep !== 0) osc.frequency.linearRampToValueAtTime(freq + sweep, now + duration)
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(volume, now + 0.01)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration)
+    osc.connect(gain)
+    osc.start()
+    osc.stop(now + duration + 0.02)
+  }
+  return {
+    fireBreak: () => {
+      playNoiseBurst({
+        duration: 0.12,
+        volume: 0.3,
+        type: "pink",
+        filterType: "bandpass",
+        filterFreq: 1200,
+        decay: 0.12,
+      })
+      playTone({ freq: 600, duration: 0.08, volume: 0.12, type: "triangle", sweep: -200 })
+    },
+    waterSplash: () => {
+      playNoiseBurst({
+        duration: 0.18,
+        volume: 0.25,
+        type: "white",
+        filterType: "lowpass",
+        filterFreq: 1500,
+        decay: 0.18,
+      })
+      playTone({ freq: 700, duration: 0.15, volume: 0.08, type: "sine", sweep: -500 })
+    },
+    earthThud: () => playTone({ freq: 140, duration: 0.12, volume: 0.2, type: "sine", sweep: -40 }),
+    windDash: () => {
+      playNoiseBurst({
+        duration: 0.2,
+        volume: 0.22,
+        type: "white",
+        filterType: "highpass",
+        filterFreq: 800,
+        decay: 0.2,
+      })
+    },
+    jump: () => playTone({ freq: 420, duration: 0.08, volume: 0.07, type: "square", sweep: 60 }),
+    platePress: () => playTone({ freq: 900, duration: 0.1, volume: 0.14, type: "triangle", sweep: -200 }),
+  }
+}
+
+// Particles helpers
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t
+}
+function hexToRgb(hex: string) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  if (!m) return { r: 255, g: 255, b: 255 }
+  return { r: Number.parseInt(m[1], 16), g: Number.parseInt(m[2], 16), b: Number.parseInt(m[3]) }
+}
+function parseColor(c: string) {
+  if (c.startsWith("#")) return hexToRgb(c)
+  const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c)
+  if (!m) return { r: 255, g: 255, b: 255 }
+  return { r: Number.parseInt(m[1]), g: Number.parseInt(m[2]), b: Number.parseInt(m[3]) }
+}
+
+export default function FourPlayerPlatformer() {
+  // Controls
+  const [bindings, setBindings] = useState<Record<number, KeyBinding>>({
+    1: { left: "a", right: "d", jump: "w", action: "s" },
+    2: { left: "j", right: "l", jump: "i", action: "k" },
+    3: { left: "ArrowLeft", right: "ArrowRight", jump: "ArrowUp", action: "ArrowDown" },
+    4: { left: "z", right: "c", jump: "x", action: "" },
+  })
+  const [showSettings, setShowSettings] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
+
+  const modalCountRef = useRef(0)
+  const pausedBeforeModalRef = useRef(false)
+  const handleModalOpenChange = useCallback(
+    (next: boolean, which: "settings" | "help") => {
+      const prevCount = modalCountRef.current
+      const nextCount = prevCount + (next ? 1 : -1)
+      modalCountRef.current = nextCount
+      if (next && prevCount === 0) {
+        pausedBeforeModalRef.current = paused
+        setPaused(true)
+      }
+      if (!next && nextCount === 0) {
+        setPaused(pausedBeforeModalRef.current)
+      }
+      if (which === "settings") setShowSettings(next)
+      else setShowHelp(next)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const input = useKeySet()
+  const sound = useSound()
+
+  const levelRef = useRef<Level>(createLevel())
+  const { spawns, exits } = useMemo(() => findSpawnsAndExits(levelRef.current), [])
+  const playersRef = useRef<Player[]>(createPlayers(spawns, bindings))
+
+  // Plate states
+  const platesRef = useRef<Map<string, PlateState>>(new Map())
+  function initPlates(level: Level) {
+    const m = new Map<string, PlateState>()
+    for (let y = 0; y < level.h; y++) {
+      for (let x = 0; x < level.w; x++) {
+        if (level.tiles[y][x] === "P") {
+          m.set(`${x},${y}`, { tx: x, ty: y, pressed: false, pressTime: 0 })
         }
       }
-      const src = ctx.createBufferSource()
-      src.buffer = buffer
-      let node: AudioNode = src
-      if (filterType) {
-        const filt = ctx.createBiquadFilter()
-        filt.type = filterType
-        filt.frequency.value = filterFreq ?? 800
-        node.connect(filt)
-        node = filt
-      }
-      const gain = ctx.createGain()
-      gain.gain.value = volume
-      node.connect(gain)
-      gain.connect(ctx.destination)
-      const now = ctx.currentTime
-      gain.gain.setValueAtTime(volume, now)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + decay)
-      src.start()
-      src.stop(now + duration)
     }
-    function playTone({
-      freq = 400,
-      duration = 0.12,
-      volume = 0.2,
-      type = "sine",
-      sweep = 0,
-    }: {
-      freq?: number
-      duration?: number
-      volume?: number
-      type?: OscillatorType
-      sweep?: number
-    }) {
-      const ctx = ensureCtx()
-      if (!ctx) return
-      const osc = ctx.createOscillator()
-      const gain = makeGain(ctx, volume)
-      osc.type = type
-      const now = ctx.currentTime
-      osc.frequency.setValueAtTime(freq, now)
-      if (sweep !== 0) osc.frequency.linearRampToValueAtTime(freq + sweep, now + duration)
-      gain.gain.setValueAtTime(0.0001, now)
-      gain.gain.exponentialRampToValueAtTime(volume, now + 0.01)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration)
-      osc.connect(gain)
-      osc.start()
-      osc.stop(now + duration + 0.02)
-    }
-    return {
-      fireBreak: () => {
-        playNoiseBurst({
-          duration: 0.12,
-          volume: 0.3,
-          type: "pink",
-          filterType: "bandpass",
-          filterFreq: 1200,
-          decay: 0.12,
-        })
-        playTone({ freq: 600, duration: 0.08, volume: 0.12, type: "triangle", sweep: -200 })
-      },
-      waterSplash: () => {
-        playNoiseBurst({
-          duration: 0.18,
-          volume: 0.25,
-          type: "white",
-          filterType: "lowpass",
-          filterFreq: 1500,
-          decay: 0.18,
-        })
-        playTone({ freq: 700, duration: 0.15, volume: 0.08, type: "sine", sweep: -500 })
-      },
-      earthThud: () => playTone({ freq: 140, duration: 0.12, volume: 0.2, type: "sine", sweep: -40 }),
-      windDash: () => {
-        playNoiseBurst({
-          duration: 0.2,
-          volume: 0.22,
-          type: "white",
-          filterType: "highpass",
-          filterFreq: 800,
-          decay: 0.2,
-        })
-      },
-      jump: () => playTone({ freq: 420, duration: 0.08, volume: 0.07, type: "square", sweep: 60 }),
-      platePress: () => playTone({ freq: 900, duration: 0.1, volume: 0.14, type: "triangle", sweep: -200 }),
-    }
+    platesRef.current = m
   }
+  useEffect(() => {
+    initPlates(levelRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Particles helpers
-  function lerp(a: number, b: number, t: number) {
-    return a + (b - a) * t
-  }
-  function hexToRgb(hex: string) {
-    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-    if (!m) return { r: 255, g: 255, b: 255 }
-    return { r: Number.parseInt(m[1], 16), g: Number.parseInt(m[2], 16), b: Number.parseInt(m[3], 16) }
-  }
-  function parseColor(c: string) {
-    if (c.startsWith("#")) return hexToRgb(c)
-    const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c)
-    if (!m) return { r: 255, g: 255, b: 255 }
-    return { r: Number.parseInt(m[1]), g: Number.parseInt(m[2]), b: Number.parseInt(m[3]) }
-  }
-
-  function doWaterAction(level: Level, p: Player) {
-    const { tx, ty } = worldToTile(p.pos.x, p.pos.y, level.tileSize)
-    // Collect seed tiles in the 3x3 neighborhood (including diagonals)
-    const seeds: Array<{ tx: number; ty: number }> = []
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const ux = tx + dx
-        const uy = ty + dy
-        if (tileAt(level, ux, uy) === "O") {
-          seeds.push({ tx: ux, ty: uy })
-        }
-      }
-    }
-    if (seeds.length === 0) return
-
-    const visited = new Set<string>()
-    const converted: Array<{ tx: number; ty: number }> = []
-    const q: Array<{ tx: number; ty: number }> = []
-
-    // Initialize queue with seeds
-    for (const s of seeds) {
-      const key = `${s.tx},${s.ty}`
-      if (!visited.has(key)) {
-        visited.add(key)
-        q.push(s)
-      }
-    }
-
-    // 4-directional adjacency flood fill
-    const dirs = [
-      { dx: 1, dy: 0 },
-      { dx: -1, dy: 0 },
-      { dx: 0, dy: 1 },
-      { dx: 0, dy: -1 },
-    ]
-
-    while (q.length > 0) {
-      const cur = q.shift()!
-      if (tileAt(level, cur.tx, cur.ty) !== "O") continue
-      setTile(level, cur.tx, cur.ty, "W")
-      converted.push(cur)
-      for (const d of dirs) {
-        const nx = cur.tx + d.dx
-        const ny = cur.ty + d.dy
-        const key = `${nx},${ny}`
-        if (!visited.has(key) && tileAt(level, nx, ny) === "O") {
-          visited.add(key)
-          q.push({ tx: nx, ty: ny })
-        }
-      }
-    }
-
-    if (converted.length > 0) {
-      // Spawn splashes for visual feedback
-      for (const c of converted) {
-        const cx = c.tx * TILE + TILE / 2
-        const cy = c.ty * TILE + TILE / 2
-        spawnWaterSplashAt(cx, cy)
-      }
-      sound.waterSplash()
-      trimParticles()
-    }
-  }
-
+  // Particles
+  const particlesRef = useRef<Particle[]>([])
   const MAX_PARTICLES = 4000
+
+  // update controls if bindings change
+  const tempPlatformsRef = useRef<TempPlatform[]>([])
+  const prevActionDownRef = useRef<Record<number, boolean>>({ 1: false, 2: false, 3: false, 4: false })
+
+  useEffect(() => {
+    playersRef.current = playersRef.current.map((p) => ({
+      ...p,
+      controls: bindings[p.id],
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bindings])
+
+  const [paused, setPaused] = useState(false)
+  const [won, setWon] = useState(false)
+  const [deaths, setDeaths] = useState(0)
+
+  const lastTimeRef = useRef<number>(0)
+  const rafRef = useRef<number>(0)
+
+  const resizeCanvas = useCallback(() => {
+    const wrap = wrapperRef.current
+    const canvas = canvasRef.current
+    if (!wrap || !canvas) return
+    const level = levelRef.current
+    const targetW = level.w * level.tileSize
+    const targetH = level.h * level.tileSize
+    const maxW = wrap.clientWidth
+    const maxH = wrap.clientHeight
+    const scale = Math.min(maxW / targetW, maxH / targetH)
+    const cssW = Math.floor(targetW * scale)
+    const cssH = Math.floor(targetH * scale)
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    canvas.style.width = cssW + "px"
+    canvas.style.height = cssH + "px"
+    canvas.width = Math.floor(targetW * dpr)
+    canvas.height = Math.floor(targetH * dpr)
+    const ctx = canvas.getContext("2d")
+    if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  }, [])
+
+  useEffect(() => {
+    resizeCanvas()
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => resizeCanvas()) : null
+    if (ro && wrapperRef.current) ro.observe(wrapperRef.current)
+    window.addEventListener("resize", resizeCanvas)
+    return () => {
+      window.removeEventListener("resize", resizeCanvas)
+      ro?.disconnect()
+    }
+  }, [resizeCanvas])
+
+  const resetGame = useCallback(() => {
+    const level = createLevel()
+    levelRef.current = level
+    tempPlatformsRef.current = []
+    initPlates(level)
+    const fresh = createPlayers(spawns, bindings)
+    playersRef.current = fresh
+    prevActionDownRef.current = { 1: false, 2: false, 3: false, 4: false }
+    particlesRef.current = []
+    setWon(false)
+    setDeaths(0)
+    setPaused(false)
+    lastTimeRef.current = performance.now()
+  }, [bindings, spawns])
+
+  // keyboard: R reset, P/Esc toggle pause
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "r") {
+        e.preventDefault()
+        resetGame()
+      } else if (e.key.toLowerCase() === "p" || e.key === "Escape") {
+        e.preventDefault()
+        setPaused((p) => !p)
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [resetGame])
+
+  function updateDoorOpen(level: Level, players: Player[]) {
+    // Keep the door logic as "2 players currently standing on plates"
+    let onPlates = 0
+    for (const p of players) {
+      const ch = tileCharAt(level, p.pos.x, p.pos.y + p.h / 2 + 1)
+      if (isPlate(ch)) onPlates++
+    }
+    level.doorOpen = onPlates >= 2
+  }
 
   // Particle spawners
   function spawnFireBurstAt(x: number, y: number) {
@@ -915,6 +1003,61 @@ function drawLevel(
     if (brokeAny) sound.fireBreak()
     tempPlatformsRef.current = tempPlatformsRef.current.filter((tp) => tileAt(level, tp.tx, tp.ty) === "X")
     trimParticles()
+  }
+
+  function doWaterAction(level: Level, p: Player) {
+    const start = worldToTile(p.pos.x, p.pos.y, level.tileSize)
+    // Seed from any dark holes in the 3x3 around the player (including diagonals)
+    const seeds: Array<{ tx: number; ty: number }> = []
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const ux = start.tx + dx
+        const uy = start.ty + dy
+        if (tileAt(level, ux, uy) === "O") {
+          seeds.push({ tx: ux, ty: uy })
+        }
+      }
+    }
+    if (seeds.length === 0) return
+
+    // Flood fill across all connected dark holes (8-direction adjacency)
+    const q: Array<{ tx: number; ty: number }> = [...seeds]
+    const seen = new Set<string>(seeds.map((s) => `${s.tx},${s.ty}`))
+    const dirs8 = [
+      [-1, -1],
+      [0, -1],
+      [1, -1],
+      [-1, 0],
+      [1, 0],
+      [-1, 1],
+      [0, 1],
+      [1, 1],
+    ]
+    let convertedCount = 0
+    const maxFill = 2000 // safety cap
+    while (q.length && convertedCount < maxFill) {
+      const { tx, ty } = q.shift()!
+      if (tileAt(level, tx, ty) !== "O") continue
+      setTile(level, tx, ty, "W")
+      convertedCount++
+      const cx = tx * TILE + TILE / 2
+      const cy = ty * TILE + TILE / 2
+      spawnWaterSplashAt(cx, cy)
+
+      for (const [dx, dy] of dirs8) {
+        const nx = tx + dx
+        const ny = ty + dy
+        const key = `${nx},${ny}`
+        if (!seen.has(key) && tileAt(level, nx, ny) === "O") {
+          seen.add(key)
+          q.push({ tx: nx, ty: ny })
+        }
+      }
+    }
+    if (convertedCount > 0) {
+      sound.waterSplash()
+      trimParticles()
+    }
   }
 
   // returns true if a platform was placed (for cooldown)
@@ -1445,8 +1588,8 @@ function drawLevel(
                         running.
                       </li>
                       <li>
-                        Water: Fills adjacent dark holes (including diagonals) and instantly flood-fills the entire
-                        connected dark pool into water you can swim through; splash on fill; droplets while running.
+                        Water: Fills adjacent dark holes (including diagonals) into water you can swim through; splash
+                        on fill; droplets while running.
                       </li>
                       <li>
                         Earth: Creates temporary stone platforms (4s cooldown); dust on spawn; crumble particles on
@@ -1496,148 +1639,5 @@ function drawLevel(
         )}
       </div>
     </div>
-  )
-}
-
-export default function FourPlayerPlatformer() {
-  // Game state
-  const [deaths, setDeaths] = useState(0)
-  const [paused, setPaused] = useState(false)
-  const [won, setWon] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
-  const [showHelp, setShowHelp] = useState(false)
-  const [bindings, setBindings] = useState({
-    1: { left: "a", right: "d", jump: "w", action: "s" },
-    2: { left: "j", right: "l", jump: "i", action: "k" },
-    3: { left: "ArrowLeft", right: "ArrowRight", jump: "ArrowUp", action: "ArrowDown" },
-    4: { left: "z", right: "c", jump: "x", action: "" },
-  })
-
-  // References
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const wrapperRef = useRef<HTMLDivElement>(null)
-  const lastTimeRef = useRef<number>(0)
-  const rafRef = useRef<number>(0)
-  const levelRef = useRef(createLevel())
-  const particlesRef = useRef<Particle[]>([])
-  const tempPlatformsRef = useRef<TempPlatform[]>([])
-  const platesRef = useRef<Map<string, PlateState>>(new Map())
-  const prevActionDownRef = useRef<Record<number, boolean>>({ 1: false, 2: false, 3: false, 4: false })
-
-  const { spawns, exits } = useMemo(() => findSpawnsAndExits(levelRef.current), [])
-  const [players, setPlayers] = useState(() => createPlayers(spawns, bindings))
-  const playersRef = useRef(players)
-  useEffect(() => {
-    playersRef.current = players
-  }, [players])
-
-  const sound = useSound()
-  const input = useKeySet()
-
-  // Reset helper
-  const resetGame = useCallback(() => {
-    levelRef.current = createLevel()
-    const { spawns } = findSpawnsAndExits(levelRef.current)
-    setPlayers(createPlayers(spawns, bindings))
-    particlesRef.current = []
-    tempPlatformsRef.current = []
-    platesRef.current = new Map()
-    setDeaths(0)
-    setWon(false)
-    setPaused(false)
-  }, [bindings])
-
-  // Door helper
-  const updateDoorOpen = useCallback((level: Level, players: Player[]) => {
-    let plateCount = 0
-    platesRef.current.clear()
-    for (let y = 0; y < level.h; y++) {
-      for (let x = 0; x < level.w; x++) {
-        const c = level.tiles[y][x]
-        if (isPlate(c)) {
-          plateCount += 1
-          const key = `${x},${y}`
-          platesRef.current.set(key, { tx: x, ty: y, pressed: false, pressTime: 0 })
-        }
-      }
-    }
-    let doorOpen = false
-    if (plateCount > 0) {
-      let playersOnPlates = 0
-      for (const p of players) {
-        const { tx, ty } = worldToTile(p.pos.x, p.pos.y, level.tileSize)
-        const key = `${tx},${ty}`
-        if (level.tiles[ty] && level.tiles[ty][tx] === "P") {
-          playersOnPlates += 1
-        }
-      }
-      doorOpen = playersOnPlates >= 2
-    }
-    level.doorOpen = doorOpen
-  }, [])
-
-  // Modal helpers
-  const handleModalOpenChange = (next: boolean, type: "settings" | "help") => {
-    if (next) {
-      setPaused(true)
-      if (type === "settings") setShowSettings(true)
-      else setShowHelp(true)
-    } else {
-      setPaused(false)
-      if (type === "settings") setShowSettings(false)
-      else setShowHelp(false)
-    }
-  }
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const onUp = (e: KeyboardEvent) => {
-      if (e.key === "r") {
-        resetGame()
-      } else if (e.key === "p" || e.key === "Escape") {
-        setPaused((p) => !p)
-      }
-    }
-    window.addEventListener("keyup", onUp)
-    return () => window.removeEventListener("keyup", onUp)
-  }, [resetGame])
-
-  // Canvas setup
-  useEffect(() => {
-    const canvas = canvasRef.current
-    const wrapper = wrapperRef.current
-    if (!canvas || !wrapper) return
-
-    const resize = () => {
-      const rect = wrapper.getBoundingClientRect()
-      canvas.width = rect.width
-      canvas.height = rect.height
-    }
-    resize()
-
-    const obs = new ResizeObserver(resize)
-    obs.observe(wrapper)
-    return () => obs.disconnect()
-  }, [])
-
-  return (
-    <FourPlayerPlatformerInner
-      deaths={deaths}
-      paused={paused}
-      won={won}
-      showSettings={showSettings}
-      showHelp={showHelp}
-      bindings={bindings}
-      capturing={null}
-      setCapturing={() => {}}
-      setBindings={() => {}}
-      resetGame={resetGame}
-      handleModalOpenChange={handleModalOpenChange}
-      canvasRef={canvasRef}
-      wrapperRef={wrapperRef}
-      setDeaths={setDeaths}
-      setPaused={setPaused}
-      setWon={setWon}
-    />
   )
 }
