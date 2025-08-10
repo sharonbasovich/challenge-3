@@ -111,19 +111,19 @@ const LEVEL_MAP: string[] = [
   "#..................#...................#",
   "#.............~~~~~#...................#",
   "#..................#...................#",
-  "#...........######Z######..............#",
+  "#...........######Q######..............#",
   "#..................#....#..............#",
   "#......###.........#....#..............#",
   "#..................#..................#",
   "#.1....O..O...2....#....#..............#",
-  "#......#####.......#....#..............#",
+  "#......#####.......#.......#..............#",
   "#..................#..................#",
-  "#...........######Z######..............#",
+  "#...........######Q######..............#",
   "#..................#...................#",
   "#.....OOOOOO.......#........fane..b....#",
   "#..................#...................#",
   "#......###.........#...................#",
-  "#..................#..................#",
+  "#..................#...................#",
   "#...3.........4....P...##OO..A.B.C...D.#",
   "########################################",
 ]
@@ -179,7 +179,7 @@ function replaceChar(str: string, index: number, char: string) {
 
 function isSolid(ch: string, doorOpen: boolean) {
   if (ch === "#") return true
-  if (ch === "Z") return !doorOpen
+  if (ch === "Q") return !doorOpen
   if (ch === "b") return true
   if (ch === "X") return true
   return false
@@ -268,14 +268,11 @@ function drawLevel(
         const key = `${x},${y}`
         const st = plates.get(key)
         const pressed = st?.pressed
-        // Base plate
         ctx.fillStyle = pressed ? "#22c55e" : "#f59e0b"
         const inset = pressed ? 8 : 6
         ctx.fillRect(px + inset, py + tileSize - inset - 2, tileSize - inset * 2, 6)
-        // Button cap
         ctx.fillStyle = pressed ? "#16a34a" : "#b45309"
         ctx.fillRect(px + inset + 2, py + tileSize - inset - 4, tileSize - (inset + 2) * 2, 3)
-        // Pulse ring shortly after press
         if (pressed && st) {
           const t = (now - st.pressTime) / 600
           if (t < 1.2) {
@@ -287,7 +284,7 @@ function drawLevel(
             ctx.stroke()
           }
         }
-      } else if (c === "Z") {
+      } else if (c === "Q") {
         if (!doorOpen) {
           ctx.fillStyle = "#7c3aed"
           ctx.fillRect(px, py, tileSize, tileSize)
@@ -309,10 +306,10 @@ function drawLevel(
         ctx.strokeRect(px + 4, py + 4, tileSize - 8, tileSize - 8)
       } else if (c === "A" || c === "B" || c === "C" || c === "D") {
         const gateColors: Record<string, { main: string; inner: string }> = {
-          A: { main: "#ef4444", inner: "#fecaca" },
-          B: { main: "#14b8a6", inner: "#99f6e4" },
-          C: { main: "#92400e", inner: "#f59e0b" },
-          D: { main: "#38bdf8", inner: "#bae6fd" },
+          A: { main: "#ef4444", inner: "#fecaca" }, // Fire
+          B: { main: "#14b8a6", inner: "#99f6e4" }, // Water
+          C: { main: "#92400e", inner: "#f59e0b" }, // Earth
+          D: { main: "#38bdf8", inner: "#bae6fd" }, // Wind
         }
         const gc = gateColors[c]
         ctx.fillStyle = gc.main
@@ -594,13 +591,39 @@ function lerp(a: number, b: number, t: number) {
 function hexToRgb(hex: string) {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
   if (!m) return { r: 255, g: 255, b: 255 }
-  return { r: Number.parseInt(m[1], 16), g: Number.parseInt(m[2], 16), b: Number.parseInt(m[3]) }
+  return { r: Number.parseInt(m[1], 16), g: Number.parseInt(m[2], 16), b: Number.parseInt(m[3], 16) }
 }
 function parseColor(c: string) {
   if (c.startsWith("#")) return hexToRgb(c)
   const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c)
   if (!m) return { r: 255, g: 255, b: 255 }
   return { r: Number.parseInt(m[1]), g: Number.parseInt(m[2]), b: Number.parseInt(m[3]) }
+}
+
+// Add a new helper to flood-fill connected dark holes (O) using 8-direction adjacency:
+function floodFillDarkToWater(level: Level, startTx: number, startTy: number) {
+  const q: Array<{ tx: number; ty: number }> = [{ tx: startTx, ty: startTy }]
+  const seen = new Set<string>()
+  let changed = 0
+  while (q.length) {
+    const { tx, ty } = q.shift()!
+    const key = `${tx},${ty}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    if (tileAt(level, tx, ty) !== "O") continue
+    setTile(level, tx, ty, "W")
+    changed++
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue
+        const nx = tx + dx
+        const ny = ty + dy
+        if (nx < 0 || ny < 0 || nx >= level.w || ny >= level.h) continue
+        if (tileAt(level, nx, ny) === "O") q.push({ tx: nx, ty: ny })
+      }
+    }
+  }
+  return changed
 }
 
 export default function FourPlayerPlatformer() {
@@ -1005,59 +1028,39 @@ export default function FourPlayerPlatformer() {
     trimParticles()
   }
 
+  // Replace the doWaterAction with a version that flood-fills from any adjacent O tiles (including diagonals). Spawns splashes at a few seed points and plays SFX once.
   function doWaterAction(level: Level, p: Player) {
-    const start = worldToTile(p.pos.x, p.pos.y, level.tileSize)
-    // Seed from any dark holes in the 3x3 around the player (including diagonals)
+    const { tx, ty } = worldToTile(p.pos.x, p.pos.y, level.tileSize)
+    // Collect seeds from the 3x3 neighborhood (including center)
     const seeds: Array<{ tx: number; ty: number }> = []
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
-        const ux = start.tx + dx
-        const uy = start.ty + dy
-        if (tileAt(level, ux, uy) === "O") {
-          seeds.push({ tx: ux, ty: uy })
-        }
+        const ux = tx + dx
+        const uy = ty + dy
+        if (tileAt(level, ux, uy) === "O") seeds.push({ tx: ux, ty: uy })
       }
     }
     if (seeds.length === 0) return
-
-    // Flood fill across all connected dark holes (8-direction adjacency)
-    const q: Array<{ tx: number; ty: number }> = [...seeds]
-    const seen = new Set<string>(seeds.map((s) => `${s.tx},${s.ty}`))
-    const dirs8 = [
-      [-1, -1],
-      [0, -1],
-      [1, -1],
-      [-1, 0],
-      [1, 0],
-      [-1, 1],
-      [0, 1],
-      [1, 1],
-    ]
-    let convertedCount = 0
-    const maxFill = 2000 // safety cap
-    while (q.length && convertedCount < maxFill) {
-      const { tx, ty } = q.shift()!
-      if (tileAt(level, tx, ty) !== "O") continue
-      setTile(level, tx, ty, "W")
-      convertedCount++
-      const cx = tx * TILE + TILE / 2
-      const cy = ty * TILE + TILE / 2
-      spawnWaterSplashAt(cx, cy)
-
-      for (const [dx, dy] of dirs8) {
-        const nx = tx + dx
-        const ny = ty + dy
-        const key = `${nx},${ny}`
-        if (!seen.has(key) && tileAt(level, nx, ny) === "O") {
-          seen.add(key)
-          q.push({ tx: nx, ty: ny })
-        }
+    // Flood-fill from each unique seed
+    const seenSeed = new Set<string>()
+    let totalChanged = 0
+    for (const s of seeds) {
+      const key = `${s.tx},${s.ty}`
+      if (seenSeed.has(key)) continue
+      seenSeed.add(key)
+      totalChanged += floodFillDarkToWater(level, s.tx, s.ty)
+    }
+    if (totalChanged > 0) {
+      // Spawn splashes at up to a handful of seeds to visualize the conversion
+      const splashSeeds = seeds.slice(0, 6)
+      for (const s of splashSeeds) {
+        const cx = s.tx * TILE + TILE / 2
+        const cy = s.ty * TILE + TILE / 2
+        spawnWaterSplashAt(cx, cy)
       }
-    }
-    if (convertedCount > 0) {
       sound.waterSplash()
-      trimParticles()
     }
+    trimParticles()
   }
 
   // returns true if a platform was placed (for cooldown)
@@ -1588,8 +1591,7 @@ export default function FourPlayerPlatformer() {
                         running.
                       </li>
                       <li>
-                        Water: Fills adjacent dark holes (including diagonals) into water you can swim through; splash
-                        on fill; droplets while running.
+                        Water: Converts adjacent dark holes (including diagonals) into water and flood-fills all connected dark holes at once; splash on fill; droplets while running.
                       </li>
                       <li>
                         Earth: Creates temporary stone platforms (4s cooldown); dust on spawn; crumble particles on
