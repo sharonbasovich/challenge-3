@@ -266,7 +266,7 @@ function drawLevel(
         }
         // Reached indicator (draw a check mark) if matching player currently on any gate of this type
         const charToId: Record<string, 1 | 2 | 3 | 4> = { A: 1, B: 2, C: 3, D: 4 }
-        const pid = charToId[c]
+        const pid = charToId[c as keyof typeof charToId]
         if (gateReached[pid]) {
           // Drop shadow
           ctx.strokeStyle = "rgba(0,0,0,0.6)"
@@ -915,22 +915,20 @@ export default function FourPlayerPlatformer() {
   // Water: convert adjacent holes (4-direction) into water
   function doWaterAction(level: Level, p: Player) {
     const { tx, ty } = worldToTile(p.pos.x, p.pos.y, level.tileSize)
-    const targets: Array<[number, number]> = [
-      [tx, ty], // current tile
-      [tx + 1, ty],
-      [tx - 1, ty],
-      [tx, ty + 1],
-      [tx, ty - 1],
-    ]
     let filled = false
-    for (const [ux, uy] of targets) {
-      const ch = tileAt(level, ux, uy)
-      if (ch === "O") {
-        setTile(level, ux, uy, "W")
-        const cx = ux * TILE + TILE / 2
-        const cy = uy * TILE + TILE / 2
-        spawnWaterSplashAt(cx, cy)
-        filled = true
+    // Include current tile plus all 8 neighbors (diagonals included)
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const ux = tx + dx
+        const uy = ty + dy
+        const ch = tileAt(level, ux, uy)
+        if (ch === "O") {
+          setTile(level, ux, uy, "W")
+          const cx = ux * TILE + TILE / 2
+          const cy = uy * TILE + TILE / 2
+          spawnWaterSplashAt(cx, cy)
+          filled = true
+        }
       }
     }
     if (filled) sound.waterSplash()
@@ -1432,8 +1430,8 @@ export default function FourPlayerPlatformer() {
                         running.
                       </li>
                       <li>
-                        Water: Fills adjacent holes into water you can swim through; splash on fill; droplets while
-                        running.
+                        Water: Fills adjacent holes (including diagonals) into water you can swim through; splash on
+                        fill; droplets while running.
                       </li>
                       <li>
                         Earth: Creates temporary stone platforms (4s cooldown); dust on spawn; crumble particles on
