@@ -78,11 +78,11 @@ const FRICTION = 0.85
 const AIR_DRAG = 0.99
 
 // Swim tuning
-const SWIM_SPEED = 180 // horizontal swim speed
-const SWIM_UP_FORCE = 1800 // upward force when holding jump
-const SWIM_MAX_UP = -260 // clamp upward swim velocity
-const SWIM_MAX_DOWN = 420 // clamp falling in water
-const WATER_DRAG_X = 0.92 // extra horizontal drag in water
+const SWIM_SPEED = 180
+const SWIM_UP_FORCE = 1800
+const SWIM_MAX_UP = -260
+const SWIM_MAX_DOWN = 420
+const WATER_DRAG_X = 0.92
 
 // Wind dash tuning
 const DASH_SPEED = 900
@@ -176,18 +176,50 @@ function isSolid(ch: string, doorOpen: boolean) {
   if (ch === "X") return true
   return false
 }
-function isHazard(ch: string) {
-  return ch === "~" || ch === "O"
-}
+
+// Dark holes and pools
 function isPlate(ch: string) {
   return ch === "P"
 }
-function isExitCharForPlayer(ch: string, playerId: number) {
-  const map = { 1: "A", 2: "B", 3: "C", 4: "D" } as const
-  return ch === map[playerId as keyof typeof map]
+
+// New colored hole helpers
+function isColoredHole(ch: string) {
+  return ch === "f" || ch === "a" || ch === "e" || ch === "n"
+}
+function safePlayerForColoredHole(ch: string): 1 | 2 | 3 | 4 | null {
+  switch (ch) {
+    case "f":
+      return 1 // Fire
+    case "a":
+      return 2 // Water
+    case "e":
+      return 3 // Earth
+    case "n":
+      return 4 // Wind
+    default:
+      return null
+  }
+}
+function isLiquidForPlayer(ch: string, playerId: number) {
+  if (ch === "W") return true
+  if (isColoredHole(ch)) {
+    return safePlayerForColoredHole(ch) === (playerId as 1 | 2 | 3 | 4)
+  }
+  return false
+}
+function isHazardFor(ch: string, playerId: number) {
+  // Green pools always deadly
+  if (ch === "~") return true
+  // Dark holes deadly to all until filled
+  if (ch === "O") return true
+  // Colored holes deadly unless it's your color
+  if (isColoredHole(ch)) {
+    return safePlayerForColoredHole(ch) !== (playerId as 1 | 2 | 3 | 4)
+  }
+  // Everything else: not a hazard
+  return false
 }
 
-// Render the level; gateReached tells which players are currently touching their gate
 function drawLevel(
   ctx: CanvasRenderingContext2D,
   level: Level,
@@ -209,13 +241,35 @@ function drawLevel(
         ctx.fillStyle = "rgba(255,255,255,0.25)"
         ctx.fillRect(px, py + tileSize - 6, tileSize, 3)
       } else if (c === "O") {
+        // Dark hole
         ctx.fillStyle = "#0f172a"
         ctx.fillRect(px, py, tileSize, tileSize)
       } else if (c === "W") {
+        // Water
         ctx.fillStyle = "rgba(14,165,233,0.65)"
         ctx.fillRect(px, py, tileSize, tileSize)
         ctx.fillStyle = "rgba(255,255,255,0.35)"
         ctx.fillRect(px, py + tileSize - 8, tileSize, 3)
+      } else if (isColoredHole(c)) {
+        // Colored holes: draw dark base with colored ring
+        const colors: Record<string, string> = {
+          f: "#ef4444", // Fire safe
+          a: "#14b8a6", // Water safe
+          e: "#92400e", // Earth safe
+          n: "#38bdf8", // Wind safe
+        }
+        ctx.fillStyle = "#0f172a"
+        ctx.fillRect(px, py, tileSize, tileSize)
+        // Outer ring
+        ctx.strokeStyle = colors[c]
+        ctx.lineWidth = 3
+        ctx.strokeRect(px + 2, py + 2, tileSize - 4, tileSize - 4)
+        // Inner glow
+        ctx.fillStyle = `${colors[c]}55`
+        ctx.fillRect(px + 6, py + 6, tileSize - 12, tileSize - 12)
+        // Surface sheen
+        ctx.fillStyle = "rgba(255,255,255,0.25)"
+        ctx.fillRect(px + 4, py + tileSize - 7, tileSize - 8, 3)
       } else if (c === "P") {
         ctx.fillStyle = "#f59e0b"
         ctx.fillRect(px + 6, py + tileSize - 8, tileSize - 12, 6)
@@ -241,13 +295,12 @@ function drawLevel(
         ctx.strokeStyle = "#f59e0b"
         ctx.strokeRect(px + 4, py + 4, tileSize - 8, tileSize - 8)
       } else if (c === "A" || c === "B" || c === "C" || c === "D") {
-        // Color-coded gates per character:
-        // A: Fire (#ef4444), B: Water (#14b8a6), C: Earth (#92400e), D: Wind (#38bdf8)
+        // Gates
         const gateColors: Record<string, { main: string; inner: string }> = {
-          A: { main: "#ef4444", inner: "#fecaca" },
-          B: { main: "#14b8a6", inner: "#99f6e4" },
-          C: { main: "#92400e", inner: "#f59e0b" },
-          D: { main: "#38bdf8", inner: "#bae6fd" },
+          A: { main: "#ef4444", inner: "#fecaca" }, // Fire
+          B: { main: "#14b8a6", inner: "#99f6e4" }, // Water
+          C: { main: "#92400e", inner: "#f59e0b" }, // Earth
+          D: { main: "#38bdf8", inner: "#bae6fd" }, // Wind
         }
         const gc = gateColors[c]
         ctx.fillStyle = gc.main
@@ -264,9 +317,9 @@ function drawLevel(
           ctx.lineTo(gx, py + tileSize - 4)
           ctx.stroke()
         }
-        // Reached indicator (draw a check mark) if matching player currently on any gate of this type
+        // Checkmark indicator if reached
         const charToId: Record<string, 1 | 2 | 3 | 4> = { A: 1, B: 2, C: 3, D: 4 }
-        const pid = charToId[c as keyof typeof charToId]
+        const pid = charToId[c]
         if (gateReached[pid]) {
           // Drop shadow
           ctx.strokeStyle = "rgba(0,0,0,0.6)"
@@ -278,7 +331,7 @@ function drawLevel(
           ctx.lineTo(px + tileSize / 2 - 2, py + tileSize - 7)
           ctx.lineTo(px + tileSize - 7, py + 8)
           ctx.stroke()
-          // Foreground check
+          // Foreground
           ctx.strokeStyle = "#ffffff"
           ctx.lineWidth = 3.5
           ctx.beginPath()
@@ -401,9 +454,7 @@ function useSound() {
       if (!Ctx) return null
       ctxRef.current = new Ctx()
     }
-    if (ctxRef.current?.state === "suspended") {
-      ctxRef.current.resume()
-    }
+    if (ctxRef.current?.state === "suspended") ctxRef.current.resume()
     return ctxRef.current
   }
   function makeGain(ctx: AudioContext, value: number) {
@@ -482,9 +533,7 @@ function useSound() {
     osc.type = type
     const now = ctx.currentTime
     osc.frequency.setValueAtTime(freq, now)
-    if (sweep !== 0) {
-      osc.frequency.linearRampToValueAtTime(freq + sweep, now + duration)
-    }
+    if (sweep !== 0) osc.frequency.linearRampToValueAtTime(freq + sweep, now + duration)
     gain.gain.setValueAtTime(0.0001, now)
     gain.gain.exponentialRampToValueAtTime(volume, now + 0.01)
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration)
@@ -515,9 +564,7 @@ function useSound() {
       })
       playTone({ freq: 700, duration: 0.15, volume: 0.08, type: "sine", sweep: -500 })
     },
-    earthThud: () => {
-      playTone({ freq: 140, duration: 0.12, volume: 0.2, type: "sine", sweep: -40 })
-    },
+    earthThud: () => playTone({ freq: 140, duration: 0.12, volume: 0.2, type: "sine", sweep: -40 }),
     windDash: () => {
       playNoiseBurst({
         duration: 0.2,
@@ -528,13 +575,11 @@ function useSound() {
         decay: 0.2,
       })
     },
-    jump: () => {
-      playTone({ freq: 420, duration: 0.08, volume: 0.07, type: "square", sweep: 60 })
-    },
+    jump: () => playTone({ freq: 420, duration: 0.08, volume: 0.07, type: "square", sweep: 60 }),
   }
 }
 
-// Particle helpers
+// Particles helpers
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t
 }
@@ -632,9 +677,7 @@ export default function FourPlayerPlatformer() {
     canvas.width = Math.floor(targetW * dpr)
     canvas.height = Math.floor(targetH * dpr)
     const ctx = canvas.getContext("2d")
-    if (ctx) {
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    }
+    if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   }, [])
 
   useEffect(() => {
@@ -686,7 +729,7 @@ export default function FourPlayerPlatformer() {
     level.doorOpen = onPlates >= 2
   }
 
-  // Particle spawners (5x count, 2x size per prior change)
+  // Particle spawners
   function spawnFireBurstAt(x: number, y: number) {
     const count = 18 * 5
     for (let i = 0; i < count; i++) {
@@ -797,7 +840,6 @@ export default function FourPlayerPlatformer() {
       })
     }
   }
-  // Footstep spawners
   function spawnFireStep(x: number, y: number, dir: number) {
     const count = 4 * 5
     for (let i = 0; i < count; i++) {
@@ -912,11 +954,10 @@ export default function FourPlayerPlatformer() {
     trimParticles()
   }
 
-  // Water: convert adjacent holes (4-direction) into water
+  // Water: convert dark holes (O) in a 3x3 (including diagonals) into water
   function doWaterAction(level: Level, p: Player) {
     const { tx, ty } = worldToTile(p.pos.x, p.pos.y, level.tileSize)
     let filled = false
-    // Include current tile plus all 8 neighbors (diagonals included)
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         const ux = tx + dx
@@ -942,7 +983,8 @@ export default function FourPlayerPlatformer() {
     const ahead = worldToTile(p.pos.x + p.facing * (p.w / 2 + 8), p.pos.y, level.tileSize)
     const canPlace = (tx: number, ty: number) => {
       const ch = tileAt(level, tx, ty)
-      return ch === "." || ch === "O" || ch === "W"
+      // Allow placing on empty, dark hole, water, and colored holes
+      return ch === "." || ch === "O" || ch === "W" || isColoredHole(ch)
     }
     let placedAt: { tx: number; ty: number } | null = null
     if (canPlace(under.tx, under.ty)) {
@@ -1069,9 +1111,9 @@ export default function FourPlayerPlatformer() {
     const justPressedAction = actionDown && !prevAction
     prevActionDownRef.current[p.id] = actionDown
 
-    // Environment checks FIRST so movement can use inWater
+    // Liquids: water, plus colored holes if safe for this player
     const centerChar = tileCharAt(level, p.pos.x, p.pos.y)
-    const inWater = centerChar === "W"
+    const inLiquid = isLiquidForPlayer(centerChar, p.id)
 
     // Wind dash
     if (p.id === 4) {
@@ -1082,14 +1124,13 @@ export default function FourPlayerPlatformer() {
       if (!p.isDashing) {
         tryStartWindDash(p)
       } else {
-        // Trail while dashing
         spawnWindTrailAt(p.pos.x, p.pos.y, "rgba(56,189,248,0.5)")
       }
     }
 
-    // Horizontal input (ignored while dashing)
+    // Horizontal movement
     if (!p.isDashing) {
-      const speed = inWater ? SWIM_SPEED : MOVE_SPEED
+      const speed = inLiquid ? SWIM_SPEED : MOVE_SPEED
       if (leftDown && !rightDown) {
         p.vel.x = -speed
         p.facing = -1
@@ -1097,21 +1138,17 @@ export default function FourPlayerPlatformer() {
         p.vel.x = speed
         p.facing = 1
       } else {
-        if (p.onGround && !inWater) p.vel.x *= FRICTION
-        else p.vel.x *= inWater ? WATER_DRAG_X : AIR_DRAG
+        if (p.onGround && !inLiquid) p.vel.x *= FRICTION
+        else p.vel.x *= inLiquid ? WATER_DRAG_X : AIR_DRAG
         if (Math.abs(p.vel.x) < 6) p.vel.x = 0
       }
     }
 
-    // Vertical/gravity or swim physics (skip normal gravity while dashing)
+    // Vertical physics
     if (!p.isDashing) {
-      if (inWater) {
-        // gentle sink
+      if (inLiquid) {
         p.vel.y += GRAVITY * 0.15 * dt
-        // swim up while holding jump
-        if (jumpDown) {
-          p.vel.y -= SWIM_UP_FORCE * dt
-        }
+        if (jumpDown) p.vel.y -= SWIM_UP_FORCE * dt
         p.vel.y = clamp(p.vel.y, SWIM_MAX_UP, SWIM_MAX_DOWN)
       } else {
         p.vel.y += GRAVITY * dt
@@ -1119,8 +1156,8 @@ export default function FourPlayerPlatformer() {
       }
     }
 
-    // Jump logic (on land only; in water we use continuous swim force)
-    if (!p.isDashing && !inWater) {
+    // Jump
+    if (!p.isDashing && !inLiquid) {
       if (jumpDown) {
         if (p.onGround && !p.jumpLock) {
           p.vel.y = -JUMP_SPEED
@@ -1139,9 +1176,9 @@ export default function FourPlayerPlatformer() {
 
     moveAndCollide(level, p, dt)
 
-    // Hazard check using player center-bottom
+    // Hazard check (tile under feet)
     const belowChar = tileCharAt(level, p.pos.x, p.pos.y + p.h / 2 + 2)
-    if (isHazard(belowChar)) {
+    if (isHazardFor(belowChar, p.id)) {
       p.pos = { x: p.spawn.x, y: p.spawn.y }
       p.vel = { x: 0, y: 0 }
       p.alive = true
@@ -1152,7 +1189,7 @@ export default function FourPlayerPlatformer() {
       setDeaths((d) => d + 1)
     }
 
-    // Abilities (Fire/Water/Earth actions)
+    // Abilities
     if (justPressedAction) {
       if (p.id === 1) {
         doFireAction(level, p)
@@ -1166,15 +1203,14 @@ export default function FourPlayerPlatformer() {
             p.abilityCooldownUntil = now + EARTH_COOLDOWN * 1000
           }
         }
-        // if on cooldown, ignore input (no placement, no sound)
       }
     }
 
-    // Step particles when moving on ground (not dashing)
+    // Step particles
     const now = performance.now()
     const speedX = Math.abs(p.vel.x)
     const stepThreshold = 60
-    if (!inWater && p.onGround && !p.isDashing && speedX > stepThreshold && (p.nextStepFxTime ?? 0) <= now) {
+    if (!inLiquid && p.onGround && !p.isDashing && speedX > stepThreshold && (p.nextStepFxTime ?? 0) <= now) {
       const dir = p.vel.x === 0 ? p.facing : p.vel.x > 0 ? 1 : -1
       const footY = p.pos.y + p.h / 2 - 2
       const footX = p.pos.x
@@ -1255,7 +1291,7 @@ export default function FourPlayerPlatformer() {
         }
       }
 
-      // Build reached map for gates this frame
+      // Gate reached map
       const gateReached: Record<1 | 2 | 3 | 4, boolean> = {
         1: !!playersRef.current.find((p) => p.id === 1)?.exitReached,
         2: !!playersRef.current.find((p) => p.id === 2)?.exitReached,
@@ -1417,7 +1453,11 @@ export default function FourPlayerPlatformer() {
                     <ul className="list-disc pl-5 space-y-1">
                       <li>Get all 4 players to their color-coded gates that match their character.</li>
                       <li>Green pools are deadly for everyone.</li>
-                      <li>Holes (dark) are deadly until Water fills them.</li>
+                      <li>Dark holes are deadly for everyone until Water fills them.</li>
+                      <li>
+                        Colored holes: Red/Teal/Brown/Blue are safe for Fire/Water/Earth/Wind respectively, deadly to
+                        others.
+                      </li>
                       <li>Stand on plates (orange) to open purple doors. You need 2 players on plates at once.</li>
                     </ul>
                   </div>
@@ -1430,8 +1470,8 @@ export default function FourPlayerPlatformer() {
                         running.
                       </li>
                       <li>
-                        Water: Fills adjacent holes (including diagonals) into water you can swim through; splash on
-                        fill; droplets while running.
+                        Water: Fills adjacent dark holes (including diagonals) into water you can swim through; splash
+                        on fill; droplets while running.
                       </li>
                       <li>
                         Earth: Creates temporary stone platforms (4s cooldown); dust on spawn; crumble particles on
