@@ -1,0 +1,26 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Player 1: Fire (top-left) with darker border -->
+  <rect x="0.5" y="0.5" width="31" height="31" fill="#ef4444" stroke="#b32e2e" stroke-width="1"/>
+  <!-- Player 2: Water (top-right) with darker border -->
+  <rect x="32.5" y="0.5" width="31" height="31" fill="#14b8a6" stroke="#0f746f" stroke-width="1"/>
+  <!-- Player 3: Earth (bottom-left) with darker border -->
+  <rect x="0.5" y="32.5" width="31" height="31" fill="#92400e" stroke="#602a06" stroke-width="1"/>
+  <!-- Player 4: Wind (bottom-right) with darker border -->
+  <rect x="32.5" y="32.5" width="31" height="31" fill="#38bdf8" stroke="#2586b0" stroke-width="1"/>
+  
+  <!-- Eyes: Player 1 (black squares) -->
+  <rect x="8" y="8" width="4" height="4" fill="#0b0b0b"/>
+  <rect x="20" y="8" width="4" height="4" fill="#0b0b0b"/>
+  
+  <!-- Eyes: Player 2 (black squares) -->
+  <rect x="40" y="8" width="4" height="4" fill="#0b0b0b"/>
+  <rect x="52" y="8" width="4" height="4" fill="#0b0b0b"/>
+  
+  <!-- Eyes: Player 3 (black squares) -->
+  <rect x="8" y="40" width="4" height="4" fill="#0b0b0b"/>
+  <rect x="20" y="40" width="4" height="4" fill="#0b0b0b"/>
+  
+  <!-- Eyes: Player 4 (black squares) -->
+  <rect x="40" y="40" width="4" height="4" fill="#0b0b0b"/>
+  <rect x="52" y="40" width="4" height="4" fill="#0b0b0b"/>
+</svg>

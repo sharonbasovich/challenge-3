@@ -95,11 +95,11 @@ const WATER_DRAG_X = 0.92;
 // Wind dash tuning
 const DASH_SPEED = 900;
 const DASH_DURATION = 0.18;
-const DASH_COOLDOWN = 3;
+const DASH_COOLDOWN = 1;
 const DOUBLE_TAP_WINDOW = 250;
 
 // Earth cooldown
-const EARTH_COOLDOWN = 4; // seconds
+const EARTH_COOLDOWN = 2; // seconds
 
 // Level progression - 3 levels with increasing complexity and teamwork requirements
 const LEVEL_MAPS: string[][] = [
@@ -131,8 +131,8 @@ const LEVEL_MAPS: string[][] = [
     "#......#..........#...#.........#",
     "#......#..........#...#.........#",
     "#......#..C......##...#.........#",
-    "#..###O#######eee#.n.D#.........#",
-    "#..#.....b.........#####........#",
+    "#..###O#######eee#nnnD#.........#",
+    "#..#.....b..........####........#",
     "#.1#.....b..............#.......#",
     "##2#.....b.............P#.......#",
     "#.3#....######..###ffff#........#",
@@ -165,7 +165,7 @@ const LEVEL_MAPS: string[][] = [
     "#....#.#....#.#.#.#......#.#....#",
     "#....#P#....#P#.#P#......#P#....#",
     "#...............................#",
-    "#.....#......#...........#.....#",
+    "#.....#......#............#.....#",
     "#OOOOOOOOOOOOOOOO#OOOOOOOOOOOOOO#",
     "#...............................#",
     "#.....A........................D#",
@@ -840,6 +840,11 @@ export default function FourPlayerPlatformer() {
   const [won, setWon] = useState(false);
   const [deaths, setDeaths] = useState(0);
   const [currentLevel, setCurrentLevel] = useState(0);
+  // Live mirror of currentLevel for use inside the RAF loop
+  const currentLevelRef = useRef<number>(0);
+  useEffect(() => {
+    currentLevelRef.current = currentLevel;
+  }, [currentLevel]);
   const [hasCompletedLevel1, setHasCompletedLevel1] = useState(false);
   const [showKeybinds, setShowKeybinds] = useState<Record<number, boolean>>({
     1: true,
@@ -847,6 +852,11 @@ export default function FourPlayerPlatformer() {
     3: true,
     4: true,
   });
+  // Mirror showKeybinds into a ref to avoid stale closures in the game loop
+  const showKeybindsRef = useRef<Record<number, boolean>>(showKeybinds);
+  useEffect(() => {
+    showKeybindsRef.current = showKeybinds;
+  }, [showKeybinds]);
 
   const levelRef = useRef<Level>(createLevel(currentLevel));
   const playersRef = useRef<Player[]>([]);
@@ -864,12 +874,8 @@ export default function FourPlayerPlatformer() {
     particlesRef.current = [];
     levelAdvancingRef.current = false;
 
-    // Show keybinds only for level 1 AND if level 1 hasn't been completed yet
-    // This means:
-    // - Level 1 first time: show keybinds
-    // - Level 1 after completion: no keybinds (even if you go back)
-    // - Any other level: no keybinds
-    const shouldShowKeybinds = currentLevel === 0 && !hasCompletedLevel1;
+    // Show keybinds only on level 1 (hardcoded)
+    const shouldShowKeybinds = currentLevel === 0;
     setShowKeybinds({
       1: shouldShowKeybinds,
       2: shouldShowKeybinds,
@@ -949,8 +955,8 @@ export default function FourPlayerPlatformer() {
     setDeaths(0);
     setPaused(false);
 
-    // Reset keybinds based on current level and completion status
-    const shouldShowKeybinds = currentLevel === 0 && !hasCompletedLevel1;
+    // Show keybinds only on level 1 (hardcoded)
+    const shouldShowKeybinds = currentLevel === 0;
     setShowKeybinds({
       1: shouldShowKeybinds,
       2: shouldShowKeybinds,
@@ -1310,7 +1316,7 @@ export default function FourPlayerPlatformer() {
       tempPlatformsRef.current.push({
         tx: under.tx,
         ty: under.ty,
-        expiresAt: now + 7000,
+        expiresAt: now + 1500,
       });
       placedAt = { tx: under.tx, ty: under.ty };
     } else if (canPlace(ahead.tx, ahead.ty)) {
@@ -1618,9 +1624,10 @@ export default function FourPlayerPlatformer() {
   function drawKeybindOverlays(ctx: CanvasRenderingContext2D) {
     const players = playersRef.current;
     const currentBindings = bindings;
+    const overlayVisible = showKeybindsRef.current; // read from ref to avoid stale state
 
     for (const p of players) {
-      if (!showKeybinds[p.id]) continue;
+      if (!overlayVisible[p.id]) continue;
 
       const { x, y } = p.pos;
       const { left, right, jump, action } = currentBindings[p.id];
@@ -1779,6 +1786,20 @@ export default function FourPlayerPlatformer() {
           if (!st.pressed) allPlatesPressed = false;
         });
 
+        // Debug: Log win condition status
+        if (currentLevelRef.current === 1) {
+          // Level 2 (0-indexed)
+          const playersAtGates = playersRef.current
+            .map((p) => `P${p.id}: ${p.exitReached}`)
+            .join(", ");
+          const plateStatus = Array.from(platesRef.current.entries())
+            .map(([key, st]) => `${key}: ${st.pressed}`)
+            .join(", ");
+          console.log(
+            `Level 2 Win Check - Players: [${playersAtGates}], Plates: [${plateStatus}], All gates: ${allPlayersAtGates}, All plates: ${allPlatesPressed}`
+          );
+        }
+
         if (
           allPlayersAtGates &&
           allPlatesPressed &&
@@ -1786,15 +1807,16 @@ export default function FourPlayerPlatformer() {
         ) {
           levelAdvancingRef.current = true;
 
-          if (currentLevel === 0) {
+          const finishedLevel = currentLevelRef.current;
+          if (finishedLevel === 0) {
             // Completing level 1 - mark it as completed and hide keybinds
             setHasCompletedLevel1(true);
             setShowKeybinds({ 1: false, 2: false, 3: false, 4: false });
           }
 
-          if (currentLevel < LEVEL_MAPS.length - 1) {
+          if (finishedLevel < LEVEL_MAPS.length - 1) {
             // Advance to next level immediately (no timeout)
-            setCurrentLevel(currentLevel + 1);
+            setCurrentLevel((prev) => Math.min(prev +  1, LEVEL_MAPS.length - 1));
             setDeaths(0);
           } else {
             // All levels completed!
