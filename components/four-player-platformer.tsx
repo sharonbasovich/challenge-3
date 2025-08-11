@@ -101,120 +101,78 @@ const DOUBLE_TAP_WINDOW = 250;
 // Earth cooldown
 const EARTH_COOLDOWN = 4; // seconds
 
-// Level progression - 5 levels with increasing complexity and teamwork requirements
+// Level progression - 3 levels with increasing complexity and teamwork requirements
 const LEVEL_MAPS: string[][] = [
   // Level 1: Tutorial - Simple movement and basic abilities
   [
-    "##############################",
-    "#............................#",
-    "#bbb....##...................#",
-    "#b1b....#2..................##",
-    "#.#......#OOOOO#...........#.#",
-    "#.........#####..........C#..#",
-    "#........................#...#",
-    "#...##.......................#",
-    "#........3...................#",
-    "#.#......#...................#",
-    "##4..........................#",
-    "#.#..........................#",
-    "#.#OOOOO.............A.B...D.#",
-    "##############################",
+    "#################################",
+    "#...............................#",
+    "#bbb....##......................#",
+    "#b1b....#2.....................##",
+    "#.#......#OOOOO#..............#.#",
+    "#.........#####.............C#..#",
+    "#...........................#...#",
+    "#...##..........................#",
+    "#........3......................#",
+    "#.#......#......................#",
+    "##4.............................#",
+    "#.#.............................#",
+    "#.#OOOOO................A.B...D.#",
+    "#################################",
   ],
 
   // Level 2: Basic cooperation - Need 2 players to open door
   [
-    "########################",
-    "#......................#",
-    "#.1................2...#",
-    "#......................#",
-    "#......bb..OOO.........#",
-    "#......................#",
-    "#..P...####Q####...P...#",
-    "#......................#",
-    "#......~~~~............#",
-    "#......................#",
-    "#.3................4...#",
-    "#......................#",
-    "#.A........B.C.......D.#",
-    "########################",
+    "#################################",
+    "#......#........................#",
+    "#..P...#........................#",
+    "#......#........................#",
+    "#......################.........#",
+    "#......#..........#...#.........#",
+    "#......#..........#...#.........#",
+    "#......#..C......##...#.........#",
+    "#..###O#######eee#.n.D#.........#",
+    "#..#.....b.........#####........#",
+    "#.1#.....b..............#.......#",
+    "##2#.....b.............P#.......#",
+    "#.3#....######..###ffff#........#",
+    "#.4########..A....B#####........#",
+    "#################################",
+    // C is earth
+    // B is water
+    // "########################",
+    // "#......................#",
+    // "#.1................2...#",
+    // "#......................#",
+    // "#......bb..OOO.........#",
+    // "#......................#",
+    // "#..P...####Q####...P...#",
+    // "#......................#",
+    // "#......~~~~............#",
+    // "#......................#",
+    // "#.3................4...#",
+    // "#......................#",
+    // "#.A........B.C.......D.#",
+    // "########################",
   ],
 
   // Level 3: Element synergy - Need specific abilities in sequence
   [
-    "##############################",
-    "#............................#",
-    "#.1...................2......#",
-    "#............................#",
-    "#.....bbbbb....OOOOOOO.......#",
-    "#............................#",
-    "#.........################...#",
-    "#.........#..............#...#",
-    "#..P......Q..fane........Q..P#",
-    "#.........#..............#...#",
-    "#.........################...#",
-    "#............................#",
-    "#.....~~~~~~~~~..............#",
-    "#............................#",
-    "#.3...................4......#",
-    "#............................#",
-    "#.A.......B........C.......D.#",
-    "##############################",
-  ],
-
-  // Level 4: Advanced teamwork - Multiple barriers and hazards
-  [
-    "####################################",
-    "#..................................#",
-    "#.1................................#",
-    "#........bbbb......................#",
-    "#.................OOOOOO...........#",
-    "#........bbbb......................#",
-    "#..................................#",
-    "#..P.....#######Q#######.........P.#",
-    "#........#.....fane.....#..........#",
-    "#........#......2.......#..........#",
-    "#........#..............#..........#",
-    "#........#......bbbb....#..........#",
-    "#........#..............#..........#",
-    "#........#......3.......#..........#",
-    "#........#......ebb.....#..........#",
-    "#........#######Q#######...........#",
-    "#..P...........................P...#",
-    "#..................................#",
-    "#.................~~~~.............#",
-    "#..................................#",
-    "#................................4.#",
-    "#..................................#",
-    "#.A..........B.......C..........D..#",
-    "####################################",
-  ],
-
-  // Level 5: Master challenge - Complex puzzle requiring all abilities
-  [
-    "########################################",
-    "#......................................#",
-    "#.1....................................#",
-    "#......bbbb........................2...#",
-    "#......................................#",
-    "#..P...########Q########...............#",
-    "#......#......fane......#..............#",
-    "#......#................#..............#",
-    "#......#....OOOOOOOO....#..............#",
-    "#......#................#..............#",
-    "#......#.......bb.......#..............#",
-    "#......#................#..............#",
-    "#......#......3...4.....#..............#",
-    "#......#................#..P...........#",
-    "#......#....e......n....#..............#",
-    "#......##################..............#",
-    "#......................................#",
-    "#.....bbbbbb...OOOOOOOO....bbbbbb......#",
-    "#......................................#",
-    "#..P.................~~~~~~~~~~~~~~.P..#",
-    "#......................................#",
-    "#......................................#",
-    "#.A...........B........C............D..#",
-    "########################################",
+    "#################################",
+    "#...............................#",
+    "#..2......1............3....4...#",
+    "######e######f###a########n######",
+    "#....#.#....#.#.#.#......#.#....#",
+    "#....#P#....#P#.#P#......#P#....#",
+    "#...............................#",
+    "#.....#......#...........#.....#",
+    "#OOOOOOOOOOOOOOOO#OOOOOOOOOOOOOO#",
+    "#...............................#",
+    "#.....A........................D#",
+    "#.....#.............#.#........##",
+    "#...................#.#.........#",
+    "#....#........B.....#C#.........#",
+    "#################################",
   ],
 ];
 
@@ -222,8 +180,6 @@ const LEVEL_DESCRIPTIONS = [
   "Tutorial: Learn basic movement and abilities",
   "Cooperation: Work together to activate switches",
   "Element Synergy: Use abilities in the right sequence",
-  "Advanced Teamwork: Complex puzzles requiring coordination",
-  "Master Challenge: Ultimate test of all abilities",
 ];
 
 // Utilities
@@ -870,6 +826,7 @@ export default function FourPlayerPlatformer() {
     3: false,
     4: false,
   });
+  const levelAdvancingRef = useRef<boolean>(false);
 
   useEffect(() => {
     playersRef.current = playersRef.current.map((p) => ({
@@ -883,6 +840,7 @@ export default function FourPlayerPlatformer() {
   const [won, setWon] = useState(false);
   const [deaths, setDeaths] = useState(0);
   const [currentLevel, setCurrentLevel] = useState(0);
+  const [hasCompletedLevel1, setHasCompletedLevel1] = useState(false);
   const [showKeybinds, setShowKeybinds] = useState<Record<number, boolean>>({
     1: true,
     2: true,
@@ -891,11 +849,7 @@ export default function FourPlayerPlatformer() {
   });
 
   const levelRef = useRef<Level>(createLevel(currentLevel));
-  const { spawns, exits } = useMemo(
-    () => findSpawnsAndExits(levelRef.current),
-    [currentLevel]
-  );
-  const playersRef = useRef<Player[]>(createPlayers(spawns, bindings));
+  const playersRef = useRef<Player[]>([]);
 
   // Update level when currentLevel changes
   useEffect(() => {
@@ -908,8 +862,21 @@ export default function FourPlayerPlatformer() {
     playersRef.current = freshPlayers;
     prevActionDownRef.current = { 1: false, 2: false, 3: false, 4: false };
     particlesRef.current = [];
-    setShowKeybinds({ 1: true, 2: true, 3: true, 4: true });
-  }, [currentLevel, bindings]);
+    levelAdvancingRef.current = false;
+
+    // Show keybinds only for level 1 AND if level 1 hasn't been completed yet
+    // This means:
+    // - Level 1 first time: show keybinds
+    // - Level 1 after completion: no keybinds (even if you go back)
+    // - Any other level: no keybinds
+    const shouldShowKeybinds = currentLevel === 0 && !hasCompletedLevel1;
+    setShowKeybinds({
+      1: shouldShowKeybinds,
+      2: shouldShowKeybinds,
+      3: shouldShowKeybinds,
+      4: shouldShowKeybinds,
+    });
+  }, [currentLevel, bindings, hasCompletedLevel1]);
 
   const handleModalOpenChange = useCallback(
     (next: boolean, which: "settings" | "help") => {
@@ -977,19 +944,38 @@ export default function FourPlayerPlatformer() {
     playersRef.current = fresh;
     prevActionDownRef.current = { 1: false, 2: false, 3: false, 4: false };
     particlesRef.current = [];
+    levelAdvancingRef.current = false;
     setWon(false);
     setDeaths(0);
     setPaused(false);
-    setShowKeybinds({ 1: true, 2: true, 3: true, 4: true });
+
+    // Reset keybinds based on current level and completion status
+    const shouldShowKeybinds = currentLevel === 0 && !hasCompletedLevel1;
+    setShowKeybinds({
+      1: shouldShowKeybinds,
+      2: shouldShowKeybinds,
+      3: shouldShowKeybinds,
+      4: shouldShowKeybinds,
+    });
+
     lastTimeRef.current = performance.now();
-  }, [bindings, currentLevel]);
+  }, [bindings, currentLevel, hasCompletedLevel1]);
 
   const resetAllProgress = useCallback(() => {
+    levelAdvancingRef.current = false;
     setCurrentLevel(0);
+    setHasCompletedLevel1(false);
     setWon(false);
     setDeaths(0);
     setPaused(false);
     setShowKeybinds({ 1: true, 2: true, 3: true, 4: true });
+  }, []);
+
+  const handleLevelChange = useCallback((newLevel: number) => {
+    levelAdvancingRef.current = false;
+    setCurrentLevel(newLevel);
+    setWon(false);
+    setPaused(false);
   }, []);
 
   // keyboard: R reset, P/Esc toggle pause
@@ -1487,13 +1473,8 @@ export default function FourPlayerPlatformer() {
     const justPressedAction = actionDown && !prevAction;
     prevActionDownRef.current[p.id] = actionDown;
 
-    // Hide keybinds overlay when any key for this player is pressed
-    if (
-      showKeybinds[p.id] &&
-      (leftDown || rightDown || jumpDown || actionDown)
-    ) {
-      setShowKeybinds((prev) => ({ ...prev, [p.id]: false }));
-    }
+    // Hide keybinds overlay after completing the first level instead of on key press
+    // (The overlay hiding will be handled in the level progression logic)
 
     // Liquids
     const centerChar = tileCharAt(level, p.pos.x, p.pos.y);
@@ -1616,6 +1597,7 @@ export default function FourPlayerPlatformer() {
     }
 
     // Exit check (still set exitReached for UI; win gating handled globally)
+    const { exits } = findSpawnsAndExits(level);
     const exitList = exits[p.id];
     p.exitReached = false;
     for (const ex of exitList) {
@@ -1796,16 +1778,34 @@ export default function FourPlayerPlatformer() {
         platesRef.current.forEach((st) => {
           if (!st.pressed) allPlatesPressed = false;
         });
-        if (allPlayersAtGates && allPlatesPressed) {
+
+        if (
+          allPlayersAtGates &&
+          allPlatesPressed &&
+          !levelAdvancingRef.current
+        ) {
+          levelAdvancingRef.current = true;
+
+          if (currentLevel === 0) {
+            // Completing level 1 - mark it as completed and hide keybinds
+            setHasCompletedLevel1(true);
+            setShowKeybinds({ 1: false, 2: false, 3: false, 4: false });
+          }
+
           if (currentLevel < LEVEL_MAPS.length - 1) {
-            // Advance to next level
-            setCurrentLevel((prev) => prev + 1);
-            setDeaths(0); // Reset deaths for new level
+            // Advance to next level immediately (no timeout)
+            setCurrentLevel(currentLevel + 1);
+            setDeaths(0);
           } else {
             // All levels completed!
             setWon(true);
             setPaused(true);
           }
+
+          // Reset the flag after a short delay to prevent multiple triggers
+          setTimeout(() => {
+            levelAdvancingRef.current = false;
+          }, 500);
         }
       }
 
@@ -2082,6 +2082,10 @@ export default function FourPlayerPlatformer() {
                       <li>5 levels total, each requiring more teamwork</li>
                       <li>Use Prev/Next buttons to practice any level</li>
                       <li>Reset All Progress button returns to Level 1</li>
+                      <li>
+                        Keybind overlays only show in Level 1 tutorial (first
+                        time)
+                      </li>
                     </ul>
                     <div className="mt-2 text-xs space-y-1">
                       {LEVEL_DESCRIPTIONS.map((desc, i) => (
@@ -2126,6 +2130,9 @@ export default function FourPlayerPlatformer() {
             <div className="flex items-center gap-2">
               <div className="text-sm text-muted-foreground">
                 Level: {currentLevel + 1}/{LEVEL_MAPS.length}
+                {hasCompletedLevel1 && currentLevel === 0 && (
+                  <span className="ml-2 text-green-600">✓</span>
+                )}
                 <div className="text-xs">
                   {LEVEL_DESCRIPTIONS[currentLevel]}
                 </div>
@@ -2133,7 +2140,7 @@ export default function FourPlayerPlatformer() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setCurrentLevel(Math.max(0, currentLevel - 1))}
+                onClick={() => handleLevelChange(Math.max(0, currentLevel - 1))}
                 disabled={currentLevel === 0}
               >
                 Prev
@@ -2142,7 +2149,7 @@ export default function FourPlayerPlatformer() {
                 size="sm"
                 variant="outline"
                 onClick={() =>
-                  setCurrentLevel(
+                  handleLevelChange(
                     Math.min(LEVEL_MAPS.length - 1, currentLevel + 1)
                   )
                 }
