@@ -1816,7 +1816,9 @@ export default function FourPlayerPlatformer() {
 
           if (finishedLevel < LEVEL_MAPS.length - 1) {
             // Advance to next level immediately (no timeout)
-            setCurrentLevel((prev) => Math.min(prev +  1, LEVEL_MAPS.length - 1));
+            setCurrentLevel((prev) =>
+              Math.min(prev + 1, LEVEL_MAPS.length - 1)
+            );
             setDeaths(0);
           } else {
             // All levels completed!
@@ -1911,6 +1913,14 @@ export default function FourPlayerPlatformer() {
       <Card className="rounded-none border-b">
         <CardContent className="p-2">
           <div className="flex flex-wrap items-center gap-2">
+            {/* Brand: icon + title */}
+            <div className="flex items-center gap-2 pr-2">
+              <img src="/icon.svg" alt="Game icon" className="h-6 w-6" />
+              <span className="text-sm font-semibold">
+                Fireboy, Watergirl, Earthkid & Windboy
+              </span>
+            </div>
+            <Separator orientation="vertical" className="mx-2 h-6" />
             <Button
               size="sm"
               variant={paused ? "default" : "outline"}
@@ -2190,6 +2200,11 @@ export default function FourPlayerPlatformer() {
                 All levels completed!
               </div>
             )}
+            {/* Right-aligned QR icon */}
+            {/* <div className="flex items-center"> */}
+              {/* <Separator orientation="vertical" className="mx-2 h-6" /> */}
+              {/* <img src="/qr.svg" alt="QR code" className="h-10 w-10" /> */}
+            {/* </div> */}
           </div>
         </CardContent>
       </Card>
